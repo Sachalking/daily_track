@@ -58,12 +58,12 @@
       <table class="min-w-full bg-white rounded-lg shadow-md">
         <thead>
           <tr>
-            <th class="py-2 px-4 border-b">Date</th>
-            <th class="py-2 px-4 border-b">Description</th>
-            <th class="py-2 px-4 border-b">Income</th>
-            <th class="py-2 px-4 border-b">Expense</th>
-            <th class="py-2 px-4 border-b">Balance</th>
-            <th class="py-2 px-4 border-b">Action</th>
+            <th class="py-2 px-4 border-b text-center">Date</th>
+            <th class="py-2 px-4 border-b text-center">Description</th>
+            <th class="py-2 px-4 border-b text-center">Income</th>
+            <th class="py-2 px-4 border-b text-center">Expense</th>
+            <th class="py-2 px-4 border-b text-center">Running Balance</th>
+            <th class="py-2 px-4 border-b text-center">Action</th>
           </tr>
         </thead>
         <tbody id="transaction-body">
@@ -84,92 +84,105 @@
   
   <script>
     let transactions = [];
-    let balance = 0; // Initial balance
-    let totalIncome = 0;
-    let totalExpense = 0;
-  
+    
+    // Load transactions from localStorage
+    function loadTransactions() {
+      const data = localStorage.getItem('transactions');
+      if (data) {
+        transactions = JSON.parse(data);
+      }
+    }
+    
+    // Save transactions to localStorage
+    function saveTransactions() {
+      localStorage.setItem('transactions', JSON.stringify(transactions));
+    }
+    
+    // Compute summary values from transactions
+    function computeSummary() {
+      let totalIncome = 0;
+      let totalExpense = 0;
+      transactions.forEach(txn => {
+        if (txn.type === 'income') {
+          totalIncome += txn.amount;
+        } else {
+          totalExpense += txn.amount;
+        }
+      });
+      let balance = totalIncome - totalExpense;
+      return { totalIncome, totalExpense, balance };
+    }
+    
     // Update summary section values
     function updateSummary() {
-      document.getElementById('current-balance').textContent = `₨ ${balance.toLocaleString('en-IN')}`;
-      document.getElementById('total-income').textContent = `₨ ${totalIncome.toLocaleString('en-IN')}`;
-      document.getElementById('total-expense').textContent = `₨ ${totalExpense.toLocaleString('en-IN')}`;
+      const summary = computeSummary();
+      document.getElementById('current-balance').textContent = `₨ ${summary.balance.toLocaleString('en-IN')}`;
+      document.getElementById('total-income').textContent = `₨ ${summary.totalIncome.toLocaleString('en-IN')}`;
+      document.getElementById('total-expense').textContent = `₨ ${summary.totalExpense.toLocaleString('en-IN')}`;
     }
-  
+    
     // Add a transaction
     function addTransaction() {
       const date = document.getElementById('date').value || new Date().toISOString().split('T')[0];
       const description = document.getElementById('description').value;
       const amount = parseFloat(document.getElementById('amount').value);
       const type = document.getElementById('type').value;
-  
+    
       if (!date || !description || !amount) {
         showWarning("Please fill all fields.");
         return;
       }
-  
+    
       const transaction = { id: Date.now(), date, description, amount, type };
       transactions.push(transaction);
-  
-      if (type === 'income') {
-        totalIncome += amount;
-        balance += amount;
-      } else {
-        totalExpense += amount;
-        balance -= amount;
-      }
-  
+      saveTransactions();
       updateSummary();
       updateTransactionTable();
       clearForm();
     }
-  
-    // Update transactions table
+    
+    // Update transactions table with running balance per row
     function updateTransactionTable() {
       const tbody = document.getElementById('transaction-body');
       tbody.innerHTML = '';
-  
+      let runningBalance = 0;
       transactions.forEach((transaction, index) => {
+        if (transaction.type === 'income') {
+          runningBalance += transaction.amount;
+        } else {
+          runningBalance -= transaction.amount;
+        }
         const row = document.createElement('tr');
         row.className = "border-b";
         row.innerHTML = `
-          <td class="py-2 px-4 border-b">${transaction.date}</td>
-          <td class="py-2 px-4 border-b">${transaction.description}</td>
-          <td class="py-2 px-4 border-b">${transaction.type === 'income' ? `₨ ${transaction.amount.toLocaleString('en-IN')}` : '-'}</td>
-          <td class="py-2 px-4 border-b">${transaction.type === 'expense' ? `₨ ${transaction.amount.toLocaleString('en-IN')}` : '-'}</td>
-          <td class="py-2 px-4 border-b">₨ ${balance.toLocaleString('en-IN')}</td>
-          <td class="py-2 px-4 border-b">
+          <td class="py-2 px-4 border-b text-center">${transaction.date}</td>
+          <td class="py-2 px-4 border-b text-center">${transaction.description}</td>
+          <td class="py-2 px-4 border-b text-center">${transaction.type === 'income' ? `₨ ${transaction.amount.toLocaleString('en-IN')}` : '-'}</td>
+          <td class="py-2 px-4 border-b text-center">${transaction.type === 'expense' ? `₨ ${transaction.amount.toLocaleString('en-IN')}` : '-'}</td>
+          <td class="py-2 px-4 border-b text-center">₨ ${runningBalance.toLocaleString('en-IN')}</td>
+          <td class="py-2 px-4 border-b text-center">
             <button class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition" onclick="deleteTransaction(${index})">Delete</button>
           </td>
         `;
         tbody.appendChild(row);
       });
     }
-  
+    
     // Delete a transaction
     function deleteTransaction(index) {
-      const transaction = transactions[index];
-      if (transaction.type === 'income') {
-        totalIncome -= transaction.amount;
-        balance -= transaction.amount;
-      } else {
-        totalExpense -= transaction.amount;
-        balance += transaction.amount;
-      }
-  
       transactions.splice(index, 1);
+      saveTransactions();
       updateSummary();
       updateTransactionTable();
     }
-  
+    
     // Clear the form fields
     function clearForm() {
       document.getElementById('date').value = new Date().toISOString().split('T')[0];
       document.getElementById('description').value = '';
       document.getElementById('amount').value = '';
     }
-  
-    updateSummary();
-  
+    
     // Warning modal functions
     function showWarning(message) {
       const modal = document.getElementById('warning-modal');
@@ -178,11 +191,16 @@
       modal.classList.remove('hidden');
       modal.classList.add('flex');
     }
-  
+    
     function closeModal() {
       const modal = document.getElementById('warning-modal');
       modal.classList.add('hidden');
     }
+    
+    // On page load, load transactions and update UI
+    loadTransactions();
+    updateSummary();
+    updateTransactionTable();
   </script>
 </body>
 </html>
